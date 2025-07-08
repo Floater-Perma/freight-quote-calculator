@@ -46,7 +46,12 @@ exports.handler = async (event, context) => {
       testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php',
       prodUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
     };
-
+    // DEBUG
+console.log('DEBUG - Environment variables:', {
+  username: process.env.CONCEPT_USERNAME ? 'SET' : 'NOT SET',
+  password: process.env.CONCEPT_PASSWORD ? 'SET' : 'NOT SET',
+  allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT'))
+});
     // Validate credentials are set
     if (!API_CONFIG.username || !API_CONFIG.password) {
       return {
@@ -85,7 +90,7 @@ exports.handler = async (event, context) => {
     };
 
     // Make the API call to Concept Logistics
-    const response = await fetch(API_CONFIG.testUrl, { // Change to prodUrl for production
+    const response = await fetch(API_CONFIG.prodUrl, { // Change to prodUrl for production
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
