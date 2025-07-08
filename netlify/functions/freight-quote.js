@@ -116,6 +116,16 @@ console.log('DEBUG - Environment variables:', {
     
     // Find the best rate (assuming first result is best or lowest cost)
     const bestRate = Array.isArray(apiResponse) ? apiResponse[0] : apiResponse;
+    if (bestRate.ErrorMessage) {
+  return {
+    statusCode: 401,
+    headers,
+    body: JSON.stringify({ 
+      error: 'Authentication failed with shipping API',
+      message: bestRate.ErrorMessage 
+    })
+  };
+}
     const markup = parseFloat(requestData.markup || 50.00);
     // Add this debug code here
     console.log('DEBUG - Full API Response:', JSON.stringify(apiResponse, null, 2));
