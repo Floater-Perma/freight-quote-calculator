@@ -113,11 +113,13 @@ console.log('DEBUG - Environment variables:', {
         body: JSON.stringify({ error: 'No rates available for this destination' })
       };
     }
-
+    
     // Find the best rate (assuming first result is best or lowest cost)
     const bestRate = Array.isArray(apiResponse) ? apiResponse[0] : apiResponse;
     const markup = parseFloat(requestData.markup || 50.00);
-
+    // Add this debug code here
+    console.log('DEBUG - Full API Response:', JSON.stringify(apiResponse, null, 2));
+    console.log('DEBUG - Best Rate Object:', JSON.stringify(bestRate, null, 2));
     // Format the response (adjust field names based on actual API response structure)
     const result = {
       baseRate: parseFloat(bestRate.priceLineHaul || bestRate.baseRate || 0),
