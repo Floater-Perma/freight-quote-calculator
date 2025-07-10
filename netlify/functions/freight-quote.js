@@ -1,6 +1,5 @@
 // netlify/functions/freight-quote.js
 exports.handler = async (event, context) => {
-  // Set CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -8,16 +7,10 @@ exports.handler = async (event, context) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+    return { statusCode: 200, headers, body: '' };
   }
 
-  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -27,8 +20,8 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Parse the request body
     const requestData = JSON.parse(event.body);
+    console.log('DEBUG - Incoming request:', JSON.stringify(requestData, null, 2));
     
     // Validate required fields
     if (!requestData.destinationZip || !requestData.quantity) {
@@ -39,59 +32,29 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Your Concept Logistics API credentials (set these in Netlify environment variables)
+    // API credentials from environment
     const API_CONFIG = {
-      username: process.env.CONCEPT_USERNAME,
-      password: process.env.CONCEPT_PASSWORD,
-      authToken: process.env.CONCEPT_AUTH_TOKEN,
-      testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php',
-      prodUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
+      authToken: process.env.CONCEPT_AUTH_TOKEN || '6CE90699-1CC4-8248-8B96-693BB1CC8CB8',
+      busId: process.env.CONCEPT_BUS_ID || 'YOUR_BUS_ID', // This may be required
+      testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php'
     };
 
-    // DEBUG - Show actual values (temporarily for debugging)
-    console.log('DEBUG - Environment variables:', {
-      username: process.env.CONCEPT_USERNAME ? 'SET' : 'NOT SET',
-      password: process.env.CONCEPT_PASSWORD ? 'SET' : 'NOT SET',
-      authToken: process.env.CONCEPT_AUTH_TOKEN ? 'SET' : 'NOT SET',
-      allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT')),
-      // Temporarily show actual values to debug the issue
-      usernameValue: process.env.CONCEPT_USERNAME,
-      passwordValue: process.env.CONCEPT_PASSWORD,
-      authTokenValue: process.env.CONCEPT_AUTH_TOKEN
+    console.log('DEBUG - API Config:', {
+      authToken: API_CONFIG.authToken ? 'SET' : 'NOT SET',
+      busId: API_CONFIG.busId ? 'SET' : 'NOT SET'
     });
 
-    // Validate credentials are set
-    if (!API_CONFIG.username || !API_CONFIG.password || !API_CONFIG.authToken) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'API credentials not configured' })
-      };
-    }
-
-    // Build the API request for Concept Logistics using CORRECT field names
-    // First, let's explicitly set the auth values
-    const authUsername = API_CONFIG.username || 'Perma_APIRates';
-    const authPassword = API_CONFIG.password || '9gmirSLpSA5SN5x';
-    const authToken = API_CONFIG.authToken || '6CE90699-1CC4-8248-8B96-693BB1CC8CB8';
-    
-    console.log('DEBUG - Auth values:', {
-      authUsername,
-      authPassword,
-      authToken
-    });
-    
+    // Build request following the corrected schema
     const apiRequest = {
-      "Autho_UserName": authUsername,
-      "Autho_Password": authPassword,
-      "AuthKey": authToken,
+      "Autho_UserName": process.env.CONCEPT_USERNAME || 'Perma_APIRates',
+      "Autho_Password": process.env.CONCEPT_PASSWORD || '9gmirSLpSA5SN5x',
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
       "OriginCountry": "US",
       "DestinationZipCode": requestData.destinationZip,
       "DestinationCountry": "US",
       "Commodities": [{
-        "HandlingQuantity": parseInt(requestData.quantity),
+        "HandlingQuantity": requestData.quantity.toString(),
         "PackagingType": requestData.packagingType || "Box",
         "Length": requestData.length || 60,
         "Width": requestData.width || 21,
@@ -106,124 +69,97 @@ exports.handler = async (event, context) => {
       "DimensionUnits": "IN",
       "NumberRatesReturned": 5,
       "RateType": "Best",
-      "PickupDate": new Date().toLocaleDateString('en-US')
+      "PickupDate": new Date().toLocaleDateString('en-US'),
+      "TypeQuery": "getRates", // Required from narrative
+      "BusId": API_CONFIG.busId, // Required from narrative
+      "ServiceClass": "STD" // Standard service
     };
 
     console.log('DEBUG - API Request:', JSON.stringify(apiRequest, null, 2));
 
-    // Make the API call to Concept Logistics
-    console.log('DEBUG - Making API call to:', API_CONFIG.testUrl);
-    console.log('DEBUG - Request payload size:', JSON.stringify(apiRequest).length);
-    
-    let response;
-    try {
-      // Add signal for timeout handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      response = await fetch(API_CONFIG.testUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': 'Netlify-Function/1.0'
-        },
-        body: JSON.stringify(apiRequest),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      console.log('DEBUG - Fetch completed successfully');
-      
-    } catch (fetchError) {
-      console.log('DEBUG - Fetch error details:', {
-        name: fetchError.name,
-        message: fetchError.message,
-        stack: fetchError.stack,
-        code: fetchError.code
-      });
-      
-      if (fetchError.name === 'AbortError') {
-        throw new Error('Request timed out after 30 seconds');
-      } else if (fetchError.name === 'TypeError') {
-        throw new Error(`Network error: ${fetchError.message}`);
-      } else {
-        throw new Error(`Fetch failed: ${fetchError.message}`);
-      }
-    }
+    // Make API call with correct headers
+    const response = await fetch(API_CONFIG.testUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'auth-token': API_CONFIG.authToken // Correct header from narrative
+      },
+      body: JSON.stringify(apiRequest)
+    });
 
-    console.log('DEBUG - Response status:', response.status);
-    console.log('DEBUG - Response headers:', Object.fromEntries(response.headers.entries()));
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log('DEBUG - Error response body:', errorText);
-      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
-    }
+    console.log('DEBUG - Response Status:', response.status);
+    console.log('DEBUG - Response Headers:', Object.fromEntries(response.headers.entries()));
 
     const responseText = await response.text();
-    console.log('DEBUG - Raw response:', responseText);
-    
+    console.log('DEBUG - Raw Response:', responseText);
+
+    if (!response.ok) {
+      console.log('DEBUG - API Error Response:', responseText);
+      return {
+        statusCode: response.status,
+        headers,
+        body: JSON.stringify({ 
+          error: 'API request failed',
+          status: response.status,
+          message: responseText
+        })
+      };
+    }
+
     let apiResponse;
     try {
       apiResponse = JSON.parse(responseText);
     } catch (parseError) {
-      console.log('DEBUG - JSON parse error:', parseError.message);
-      throw new Error(`Invalid JSON response: ${responseText}`);
+      console.log('DEBUG - JSON Parse Error:', parseError.message);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Invalid JSON response',
+          response: responseText
+        })
+      };
     }
-    
-    console.log('DEBUG - Parsed API Response:', JSON.stringify(apiResponse, null, 2));
 
-    // Check if we got results
-    if (!apiResponse || apiResponse.length === 0) {
-      console.log('DEBUG - No rates returned from API');
+    console.log('DEBUG - Parsed Response:', JSON.stringify(apiResponse, null, 2));
+
+    // Check for no results
+    if (!apiResponse || (Array.isArray(apiResponse) && apiResponse.length === 0)) {
       return {
         statusCode: 404,
         headers,
-        body: JSON.stringify({ error: 'No rates available for this destination' })
+        body: JSON.stringify({ error: 'No rates available' })
       };
     }
-    
-    // Find the best rate (assuming first result is best or lowest cost)
+
+    // Get the best rate
     const bestRate = Array.isArray(apiResponse) ? apiResponse[0] : apiResponse;
-    console.log('DEBUG - Best Rate Object:', JSON.stringify(bestRate, null, 2));
     
-    // Check for error message in various possible formats
-    if (bestRate.ErrorMessage || bestRate.error || bestRate.Error) {
-      const errorMsg = bestRate.ErrorMessage || bestRate.error || bestRate.Error;
-      console.log('DEBUG - API returned error:', errorMsg);
+    // Check for API errors
+    if (bestRate.ErrorMessage || bestRate.error) {
+      const errorMsg = bestRate.ErrorMessage || bestRate.error;
+      console.log('DEBUG - API Error:', errorMsg);
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: 'Shipping API error',
-          message: errorMsg 
+          error: 'API Error',
+          message: errorMsg
         })
       };
     }
 
-    // Check if required fields are present
-    if (!bestRate.priceTotal && !bestRate.total) {
-      console.log('DEBUG - No pricing data in response');
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          error: 'No pricing data returned from API',
-          debugInfo: bestRate 
-        })
-      };
-    }
-
+    // Calculate markup
     const markup = parseFloat(requestData.markup || 50.00);
     
-    // Calculate accessorials total from the array
+    // Calculate accessorials
     let accessorialsTotal = 0;
     if (bestRate.priceAccessorials && Array.isArray(bestRate.priceAccessorials)) {
       accessorialsTotal = bestRate.priceAccessorials.reduce((sum, acc) => sum + (acc.accessorialPrice || 0), 0);
     }
 
-    // Format the response using the correct field names from the API documentation
+    // Format response
     const result = {
       baseRate: parseFloat(bestRate.priceLineHaul || 0),
       fuelSurcharge: parseFloat(bestRate.priceFuelSurcharge || 0),
@@ -237,6 +173,8 @@ exports.handler = async (event, context) => {
       apiQuoteNumber: bestRate.apiQuoteNumber || 'Unknown'
     };
 
+    console.log('DEBUG - Final Result:', JSON.stringify(result, null, 2));
+
     return {
       statusCode: 200,
       headers,
@@ -244,14 +182,14 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('Freight quote error:', error);
+    console.error('DEBUG - Error:', error);
     
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Unable to calculate freight quote',
-        message: error.message 
+        error: 'Request failed',
+        message: error.message
       })
     };
   }
