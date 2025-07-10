@@ -44,8 +44,6 @@ exports.handler = async (event, context) => {
       username: process.env.CONCEPT_USERNAME,
       password: process.env.CONCEPT_PASSWORD,
       authToken: process.env.CONCEPT_AUTH_TOKEN,
-       // Build the API request for Concept Logistics using CORRECT field names
-    
       testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php',
       prodUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
     };
@@ -67,12 +65,11 @@ exports.handler = async (event, context) => {
       };
     }
 
-       // Build the API request for Concept Logistics using CORRECT field names
+    // Build the API request for Concept Logistics using CORRECT field names
     const apiRequest = {
       "Autho_UserName": API_CONFIG.username,
       "Autho_Password": API_CONFIG.password,
-      "AuthKey": API_CONFIG.authToken, // They call it "AuthKey" not "AuthToken"
-      
+      "AuthKey": API_CONFIG.authToken,
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
       "OriginCountry": "US",
