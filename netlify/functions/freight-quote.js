@@ -97,11 +97,11 @@ exports.handler = async (event, context) => {
     console.log('DEBUG - API Request:', JSON.stringify(apiRequest, null, 2));
 
     // Make the API call to Concept Logistics
-    console.log('DEBUG - Making API call to:', API_CONFIG.prodUrl);
+    console.log('DEBUG - Making API call to:', API_CONFIG.testUrl);
     
     let response;
     try {
-      response = await fetch(API_CONFIG.prodUrl, { // Using TEST URL first
+      response = await fetch(API_CONFIG.testUrl, { // Back to TEST URL
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
