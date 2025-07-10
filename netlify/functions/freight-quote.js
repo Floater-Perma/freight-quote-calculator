@@ -67,12 +67,11 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Build the API request for Concept Logistics using CORRECT field names
-    
+       // Build the API request for Concept Logistics using CORRECT field names
     const apiRequest = {
       "Autho_UserName": API_CONFIG.username,
       "Autho_Password": API_CONFIG.password,
-      "AuthToken": API_CONFIG.authToken, // Try standard AuthToken field name
+      "AuthKey": API_CONFIG.authToken, // They call it "AuthKey" not "AuthToken"
       
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
