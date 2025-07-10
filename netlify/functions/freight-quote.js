@@ -23,7 +23,7 @@ exports.handler = async (event, context) => {
     const requestData = JSON.parse(event.body);
     console.log('DEBUG - Incoming request:', JSON.stringify(requestData, null, 2));
     
-    // Validate required fields
+    // Enhanced validation
     if (!requestData.destinationZip || !requestData.quantity) {
       return {
         statusCode: 400,
@@ -32,10 +32,50 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Validate zip codes (basic US zip code validation)
+    const zipRegex = /^\d{5}(-\d{4})?$/;
+    if (!zipRegex.test(requestData.destinationZip)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid destination zip code format' })
+      };
+    }
+
+    if (requestData.originZip && !zipRegex.test(requestData.originZip)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid origin zip code format' })
+      };
+    }
+
+    // Validate freight class (common values: 50, 55, 60, 65, 70, 77.5, 85, 92.5, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500)
+    const freightClass = parseInt(requestData.freightClass || 100);
+    const validFreightClasses = [50, 55, 60, 65, 70, 77.5, 85, 92.5, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
+    if (!validFreightClasses.includes(freightClass)) {
+      console.log(`DEBUG - Invalid freight class: ${freightClass}, using default 100`);
+    }
+
+    // Validate packaging type - use common freight packaging codes
+    const packagingTypeMap = {
+      'Box': 'BX',
+      'Pallet': 'PLT', 
+      'Crate': 'CRT',
+      'Bag': 'BAG',
+      'Bundle': 'BDL',
+      'Drum': 'DRM',
+      'Tube': 'TUB',
+      'Roll': 'ROL'
+    };
+    
+    const packagingType = packagingTypeMap[requestData.packagingType] || requestData.packagingType || 'BX';
+    console.log(`DEBUG - Using packaging type: ${packagingType}`);
+
     // API credentials from environment
     const API_CONFIG = {
       authToken: process.env.CONCEPT_AUTH_TOKEN || '6CE90699-1CC4-8248-8B96-693BB1CC8CB8',
-      busId: process.env.CONCEPT_BUS_ID || 'YOUR_BUS_ID', // This may be required
+      busId: process.env.CONCEPT_BUS_ID || 'YOUR_BUS_ID',
       testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php'
     };
 
@@ -55,17 +95,17 @@ exports.handler = async (event, context) => {
       "DestinationCountry": "USA",
       "Commodities": [{
         "HandlingQuantity": parseInt(requestData.quantity), // Numeric per docs
-        "PackagingType": requestData.packagingType || "Box",
-        "Length": requestData.length || 60,
-        "Width": requestData.width || 21,
-        "Height": requestData.height || 30,
-        "WeightTotal": (requestData.weightPerUnit || 145) * parseInt(requestData.quantity),
+        "PackagingType": packagingType, // Use mapped packaging type
+        "Length": parseFloat(requestData.length || 60),
+        "Width": parseFloat(requestData.width || 21),
+        "Height": parseFloat(requestData.height || 30),
+        "WeightTotal": parseFloat((requestData.weightPerUnit || 145) * parseInt(requestData.quantity)),
         "HazardousMaterial": false, // Boolean value per docs
         "PiecesTotal": parseInt(requestData.quantity),
-        "FreightClass": parseInt(requestData.freightClass || 100),
+        "FreightClass": freightClass, // Use validated freight class
         "Description": requestData.description || "Standard Product"
       }],
-      "WeightUnits": "LB", // Per documentation: LB=Pounds
+      "WeightUnits": "LBS", // Try LBS instead of LB
       "DimensionUnits": "IN", // Per documentation: IN=Inches
       "NumberRatesReturned": 5,
       "RateType": "Best",
@@ -94,6 +134,21 @@ exports.handler = async (event, context) => {
 
     const responseText = await response.text();
     console.log('DEBUG - Raw Response:', responseText);
+
+    // Check if the response is HTML (error page) instead of JSON
+    const isHtmlResponse = response.headers.get('content-type')?.includes('text/html');
+    if (isHtmlResponse) {
+      console.log('DEBUG - Received HTML response instead of JSON, possible authentication or endpoint issue');
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          error: 'API returned HTML instead of JSON',
+          message: 'This usually indicates authentication issues or wrong endpoint',
+          responsePreview: responseText.substring(0, 500) + '...'
+        })
+      };
+    }
 
     if (!response.ok) {
       console.log('DEBUG - API Error Response:', responseText);
