@@ -98,21 +98,43 @@ exports.handler = async (event, context) => {
 
     // Make the API call to Concept Logistics
     console.log('DEBUG - Making API call to:', API_CONFIG.testUrl);
+    console.log('DEBUG - Request payload size:', JSON.stringify(apiRequest).length);
     
     let response;
     try {
-      response = await fetch(API_CONFIG.testUrl, { // Back to TEST URL
+      // Add signal for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      response = await fetch(API_CONFIG.testUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'User-Agent': 'Netlify-Function/1.0'
         },
         body: JSON.stringify(apiRequest),
-        timeout: 30000 // 30 second timeout
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      console.log('DEBUG - Fetch completed successfully');
+      
     } catch (fetchError) {
-      console.log('DEBUG - Fetch error:', fetchError.message);
-      throw new Error(`Network request failed: ${fetchError.message}`);
+      console.log('DEBUG - Fetch error details:', {
+        name: fetchError.name,
+        message: fetchError.message,
+        stack: fetchError.stack,
+        code: fetchError.code
+      });
+      
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Request timed out after 30 seconds');
+      } else if (fetchError.name === 'TypeError') {
+        throw new Error(`Network error: ${fetchError.message}`);
+      } else {
+        throw new Error(`Fetch failed: ${fetchError.message}`);
+      }
     }
 
     console.log('DEBUG - Response status:', response.status);
