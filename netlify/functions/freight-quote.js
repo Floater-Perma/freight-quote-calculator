@@ -43,6 +43,7 @@ exports.handler = async (event, context) => {
     const API_CONFIG = {
       username: process.env.CONCEPT_USERNAME,
       password: process.env.CONCEPT_PASSWORD,
+      authToken: process.env.CONCEPT_AUTH_TOKEN,
       testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php',
       prodUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
     };
@@ -51,11 +52,12 @@ exports.handler = async (event, context) => {
     console.log('DEBUG - Environment variables:', {
       username: process.env.CONCEPT_USERNAME ? 'SET' : 'NOT SET',
       password: process.env.CONCEPT_PASSWORD ? 'SET' : 'NOT SET',
+      authToken: process.env.CONCEPT_AUTH_TOKEN ? 'SET' : 'NOT SET',
       allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT'))
     });
 
-    // Validate credentials are set (removed authToken check since it's not in the API docs)
-    if (!API_CONFIG.username || !API_CONFIG.password) {
+    // Validate credentials are set
+    if (!API_CONFIG.username || !API_CONFIG.password || !API_CONFIG.authToken) {
       return {
         statusCode: 500,
         headers,
@@ -67,6 +69,7 @@ exports.handler = async (event, context) => {
     const apiRequest = {
       "Autho_UserName": API_CONFIG.username,
       "Autho_Password": API_CONFIG.password,
+      "3B7BB4A7-F2C3-8441-A130-CECDA9CAA5AE": API_CONFIG.authToken, // This appears to be the auth token field
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
       "OriginCountry": "US",
@@ -94,11 +97,11 @@ exports.handler = async (event, context) => {
     console.log('DEBUG - API Request:', JSON.stringify(apiRequest, null, 2));
 
     // Make the API call to Concept Logistics
-    console.log('DEBUG - Making API call to:', API_CONFIG.testUrl);
+    console.log('DEBUG - Making API call to:', API_CONFIG.prodUrl);
     
     let response;
     try {
-      response = await fetch(API_CONFIG.testUrl, { // Using TEST URL first
+      response = await fetch(API_CONFIG.prodUrl, { // Using TEST URL first
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
