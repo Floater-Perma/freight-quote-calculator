@@ -50,9 +50,9 @@ exports.handler = async (event, context) => {
       "Autho_Password": process.env.CONCEPT_PASSWORD || '9gmirSLpSA5SN5x',
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
-      "OriginCountry": "US",
+      "OriginCountry": "USA", // Changed from "US" to "USA"
       "DestinationZipCode": requestData.destinationZip,
-      "DestinationCountry": "US",
+      "DestinationCountry": "USA", // Changed from "US" to "USA"
       "Commodities": [{
         "HandlingQuantity": requestData.quantity.toString(),
         "PackagingType": requestData.packagingType || "Box",
