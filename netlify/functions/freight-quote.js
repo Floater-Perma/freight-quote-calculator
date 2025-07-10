@@ -48,12 +48,16 @@ exports.handler = async (event, context) => {
       prodUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
     };
 
-    // DEBUG
+    // DEBUG - Show actual values (temporarily for debugging)
     console.log('DEBUG - Environment variables:', {
       username: process.env.CONCEPT_USERNAME ? 'SET' : 'NOT SET',
       password: process.env.CONCEPT_PASSWORD ? 'SET' : 'NOT SET',
       authToken: process.env.CONCEPT_AUTH_TOKEN ? 'SET' : 'NOT SET',
-      allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT'))
+      allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT')),
+      // Temporarily show actual values to debug the issue
+      usernameValue: process.env.CONCEPT_USERNAME,
+      passwordValue: process.env.CONCEPT_PASSWORD,
+      authTokenValue: process.env.CONCEPT_AUTH_TOKEN
     });
 
     // Validate credentials are set
@@ -66,10 +70,21 @@ exports.handler = async (event, context) => {
     }
 
     // Build the API request for Concept Logistics using CORRECT field names
+    // First, let's explicitly set the auth values
+    const authUsername = API_CONFIG.username || 'Perma_APIRates';
+    const authPassword = API_CONFIG.password || '9gmirSLpSA5SN5x';
+    const authToken = API_CONFIG.authToken || '6CE90699-1CC4-8248-8B96-693BB1CC8CB8';
+    
+    console.log('DEBUG - Auth values:', {
+      authUsername,
+      authPassword,
+      authToken
+    });
+    
     const apiRequest = {
-      "Autho_UserName": API_CONFIG.username,
-      "Autho_Password": API_CONFIG.password,
-      "AuthKey": API_CONFIG.authToken,
+      "Autho_UserName": authUsername,
+      "Autho_Password": authPassword,
+      "AuthKey": authToken,
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
       "OriginCountry": "US",
