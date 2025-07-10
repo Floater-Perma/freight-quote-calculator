@@ -64,9 +64,8 @@ console.log('DEBUG - Environment variables:', {
 
     // Build the API request for Concept Logistics
     const apiRequest = {
-      "Perma_APIRates": API_CONFIG.username,
-      "dWja6j0SEWuwh8e": API_CONFIG.password,
-      "3B7BB4A7-F2C3-8441-A130-CECDA9CAA5AE": API_CONFIG.authToken,
+      "Autho_UserName": API_CONFIG.username,
+      "Autho_Password": API_CONFIG.password,
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
       "OriginCountry": "US",
@@ -81,7 +80,7 @@ console.log('DEBUG - Environment variables:', {
         "WeightTotal": (requestData.weightPerUnit || 145) * parseInt(requestData.quantity),
         "HazardousMaterial": false,
         "PiecesTotal": parseInt(requestData.quantity),
-        "FreightClass": requestData.freightClass || "100",
+        "FreightClass": parseInt(requestData.freightClass || 100),
         "Description": requestData.description || "Standard Product"
       }],
       "WeightUnits": "LB",
