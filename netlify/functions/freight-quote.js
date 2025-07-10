@@ -43,6 +43,7 @@ exports.handler = async (event, context) => {
     const API_CONFIG = {
       username: process.env.CONCEPT_USERNAME,
       password: process.env.CONCEPT_PASSWORD,
+      authToken: process.env.CONCEPT_AUTH_TOKEN,
       testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php',
       prodUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
     };
@@ -53,7 +54,7 @@ console.log('DEBUG - Environment variables:', {
   allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT'))
 });
     // Validate credentials are set
-    if (!API_CONFIG.username || !API_CONFIG.password) {
+    if (!API_CONFIG.username || !API_CONFIG.password || !API_CONFIG.authToken) {
       return {
         statusCode: 500,
         headers,
@@ -63,8 +64,9 @@ console.log('DEBUG - Environment variables:', {
 
     // Build the API request for Concept Logistics
     const apiRequest = {
-      "BStew": API_CONFIG.username,
-      "363Hamburg": API_CONFIG.password,
+      "Perma_APIRates": API_CONFIG.username,
+      "dWja6j0SEWuwh8e": API_CONFIG.password,
+      "3B7BB4A7-F2C3-8441-A130-CECDA9CAA5AE": API_CONFIG.authToken,
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
       "OriginCountry": "US",
