@@ -43,18 +43,19 @@ exports.handler = async (event, context) => {
     const API_CONFIG = {
       username: process.env.CONCEPT_USERNAME,
       password: process.env.CONCEPT_PASSWORD,
-      authToken: process.env.CONCEPT_AUTH_TOKEN,
       testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php',
       prodUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
     };
+
     // DEBUG
-console.log('DEBUG - Environment variables:', {
-  username: process.env.CONCEPT_USERNAME ? 'SET' : 'NOT SET',
-  password: process.env.CONCEPT_PASSWORD ? 'SET' : 'NOT SET',
-  allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT'))
-});
-    // Validate credentials are set
-    if (!API_CONFIG.username || !API_CONFIG.password || !API_CONFIG.authToken) {
+    console.log('DEBUG - Environment variables:', {
+      username: process.env.CONCEPT_USERNAME ? 'SET' : 'NOT SET',
+      password: process.env.CONCEPT_PASSWORD ? 'SET' : 'NOT SET',
+      allEnvVars: Object.keys(process.env).filter(key => key.includes('CONCEPT'))
+    });
+
+    // Validate credentials are set (removed authToken check since it's not in the API docs)
+    if (!API_CONFIG.username || !API_CONFIG.password) {
       return {
         statusCode: 500,
         headers,
@@ -62,7 +63,7 @@ console.log('DEBUG - Environment variables:', {
       };
     }
 
-    // Build the API request for Concept Logistics
+    // Build the API request for Concept Logistics using CORRECT field names
     const apiRequest = {
       "Autho_UserName": API_CONFIG.username,
       "Autho_Password": API_CONFIG.password,
@@ -90,8 +91,11 @@ console.log('DEBUG - Environment variables:', {
       "PickupDate": new Date().toLocaleDateString('en-US')
     };
 
+    console.log('DEBUG - API Request:', JSON.stringify(apiRequest, null, 2));
+
     // Make the API call to Concept Logistics
-    const response = await fetch(API_CONFIG.prodUrl, { // Change to prodUrl for production
+    console.log('DEBUG - Making API call to:', API_CONFIG.prodUrl);
+    const response = await fetch(API_CONFIG.prodUrl, { // Change to testUrl for testing
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,14 +104,31 @@ console.log('DEBUG - Environment variables:', {
       body: JSON.stringify(apiRequest)
     });
 
+    console.log('DEBUG - Response status:', response.status);
+    console.log('DEBUG - Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.log('DEBUG - Error response body:', errorText);
+      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const apiResponse = await response.json();
+    const responseText = await response.text();
+    console.log('DEBUG - Raw response:', responseText);
+    
+    let apiResponse;
+    try {
+      apiResponse = JSON.parse(responseText);
+    } catch (parseError) {
+      console.log('DEBUG - JSON parse error:', parseError.message);
+      throw new Error(`Invalid JSON response: ${responseText}`);
+    }
+    
+    console.log('DEBUG - Parsed API Response:', JSON.stringify(apiResponse, null, 2));
 
     // Check if we got results
     if (!apiResponse || apiResponse.length === 0) {
+      console.log('DEBUG - No rates returned from API');
       return {
         statusCode: 404,
         headers,
@@ -117,30 +138,55 @@ console.log('DEBUG - Environment variables:', {
     
     // Find the best rate (assuming first result is best or lowest cost)
     const bestRate = Array.isArray(apiResponse) ? apiResponse[0] : apiResponse;
-    if (bestRate.ErrorMessage) {
-  return {
-    statusCode: 401,
-    headers,
-    body: JSON.stringify({ 
-      error: 'Authentication failed with shipping API',
-      message: bestRate.ErrorMessage 
-    })
-  };
-}
-    const markup = parseFloat(requestData.markup || 50.00);
-    // Add this debug code here
-    console.log('DEBUG - Full API Response:', JSON.stringify(apiResponse, null, 2));
     console.log('DEBUG - Best Rate Object:', JSON.stringify(bestRate, null, 2));
-    // Format the response (adjust field names based on actual API response structure)
+    
+    // Check for error message in various possible formats
+    if (bestRate.ErrorMessage || bestRate.error || bestRate.Error) {
+      const errorMsg = bestRate.ErrorMessage || bestRate.error || bestRate.Error;
+      console.log('DEBUG - API returned error:', errorMsg);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Shipping API error',
+          message: errorMsg 
+        })
+      };
+    }
+
+    // Check if required fields are present
+    if (!bestRate.priceTotal && !bestRate.total) {
+      console.log('DEBUG - No pricing data in response');
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'No pricing data returned from API',
+          debugInfo: bestRate 
+        })
+      };
+    }
+
+    const markup = parseFloat(requestData.markup || 50.00);
+    
+    // Calculate accessorials total from the array
+    let accessorialsTotal = 0;
+    if (bestRate.priceAccessorials && Array.isArray(bestRate.priceAccessorials)) {
+      accessorialsTotal = bestRate.priceAccessorials.reduce((sum, acc) => sum + (acc.accessorialPrice || 0), 0);
+    }
+
+    // Format the response using the correct field names from the API documentation
     const result = {
-      baseRate: parseFloat(bestRate.priceLineHaul || bestRate.baseRate || 0),
-      fuelSurcharge: parseFloat(bestRate.priceFuelSurcharge || bestRate.fuelSurcharge || 0),
-      accessorials: parseFloat(bestRate.priceAccessorials || bestRate.accessorials || 0),
-      subtotal: parseFloat(bestRate.priceTotal || bestRate.total || 0),
+      baseRate: parseFloat(bestRate.priceLineHaul || 0),
+      fuelSurcharge: parseFloat(bestRate.priceFuelSurcharge || 0),
+      accessorials: accessorialsTotal,
+      subtotal: parseFloat(bestRate.priceTotal || 0),
       markup: markup,
-      total: parseFloat(bestRate.priceTotal || bestRate.total || 0) + markup,
-      carrier: bestRate.carrierName || bestRate.carrier || 'Unknown',
-      transitTime: bestRate.transitTime || bestRate.transitDays || 'Unknown'
+      total: parseFloat(bestRate.priceTotal || 0) + markup,
+      carrier: bestRate.carrierName || 'Unknown',
+      transitTime: bestRate.transitTime || 'Unknown',
+      serviceLevel: bestRate.serviceLevel || 'Unknown',
+      apiQuoteNumber: bestRate.apiQuoteNumber || 'Unknown'
     };
 
     return {
