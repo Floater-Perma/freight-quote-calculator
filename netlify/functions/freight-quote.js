@@ -44,35 +44,36 @@ exports.handler = async (event, context) => {
       busId: API_CONFIG.busId ? 'SET' : 'NOT SET'
     });
 
-    // Build request following the corrected schema
+    // Build request following the official API documentation
     const apiRequest = {
       "Autho_UserName": process.env.CONCEPT_USERNAME || 'Perma_APIRates',
       "Autho_Password": process.env.CONCEPT_PASSWORD || '9gmirSLpSA5SN5x',
       "Mode": "LTL",
       "OriginZipCode": requestData.originZip || "14204",
-      "OriginCountry": "USA", // Changed from "US" to "USA"
+      "OriginCountry": "USA",
       "DestinationZipCode": requestData.destinationZip,
-      "DestinationCountry": "USA", // Changed from "US" to "USA"
+      "DestinationCountry": "USA",
       "Commodities": [{
-        "HandlingQuantity": requestData.quantity.toString(),
+        "HandlingQuantity": parseInt(requestData.quantity), // Numeric per docs
         "PackagingType": requestData.packagingType || "Box",
         "Length": requestData.length || 60,
         "Width": requestData.width || 21,
         "Height": requestData.height || 30,
         "WeightTotal": (requestData.weightPerUnit || 145) * parseInt(requestData.quantity),
-        "HazardousMaterial": false,
+        "HazardousMaterial": false, // Boolean value per docs
         "PiecesTotal": parseInt(requestData.quantity),
         "FreightClass": parseInt(requestData.freightClass || 100),
         "Description": requestData.description || "Standard Product"
       }],
-      "WeightUnits": "LB",
-      "DimensionUnits": "IN",
+      "WeightUnits": "LB", // Per documentation: LB=Pounds
+      "DimensionUnits": "IN", // Per documentation: IN=Inches
       "NumberRatesReturned": 5,
       "RateType": "Best",
-      "PickupDate": new Date().toLocaleDateString('en-US'),
-      "TypeQuery": "getRates", // Required from narrative
-      "BusId": API_CONFIG.busId, // Required from narrative
-      "ServiceClass": "STD" // Standard service
+      "PickupDate": new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit' 
+      }).replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$1/$2/$3') // Ensure mm/dd/yyyy format
     };
 
     console.log('DEBUG - API Request:', JSON.stringify(apiRequest, null, 2));
@@ -83,7 +84,7 @@ exports.handler = async (event, context) => {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'auth-token': API_CONFIG.authToken // Correct header from narrative
+        'auth-token': API_CONFIG.authToken
       },
       body: JSON.stringify(apiRequest)
     });
