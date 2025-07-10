@@ -57,19 +57,24 @@ exports.handler = async (event, context) => {
       console.log(`DEBUG - Invalid freight class: ${freightClass}, using default 100`);
     }
 
-    // Validate packaging type - use common freight packaging codes
+    // Updated packaging type mapping based on Concept Logistics API documentation
+    // Common freight packaging codes that are typically accepted
     const packagingTypeMap = {
-      'Box': 'BX',
-      'Pallet': 'PLT', 
-      'Crate': 'CRT',
+      'Box': 'BOX',
+      'Pallet': 'PALLET', 
+      'Crate': 'CRATE',
       'Bag': 'BAG',
-      'Bundle': 'BDL',
-      'Drum': 'DRM',
-      'Tube': 'TUB',
-      'Roll': 'ROL'
+      'Bundle': 'BUNDLE',
+      'Drum': 'DRUM',
+      'Tube': 'TUBE',
+      'Roll': 'ROLL',
+      'Carton': 'CARTON',
+      'Case': 'CASE',
+      'Skid': 'SKID'
     };
     
-    const packagingType = packagingTypeMap[requestData.packagingType] || requestData.packagingType || 'BX';
+    // Use the mapped value, or if not found, try the original value, or default to 'BOX'
+    const packagingType = packagingTypeMap[requestData.packagingType] || requestData.packagingType || 'BOX';
     console.log(`DEBUG - Using packaging type: ${packagingType}`);
 
     // API credentials from environment
@@ -135,21 +140,6 @@ exports.handler = async (event, context) => {
     const responseText = await response.text();
     console.log('DEBUG - Raw Response:', responseText);
 
-    // Check if the response is HTML (error page) instead of JSON
-    const isHtmlResponse = response.headers.get('content-type')?.includes('text/html');
-    if (isHtmlResponse) {
-      console.log('DEBUG - Received HTML response instead of JSON, possible authentication or endpoint issue');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'API returned HTML instead of JSON',
-          message: 'This usually indicates authentication issues or wrong endpoint',
-          responsePreview: responseText.substring(0, 500) + '...'
-        })
-      };
-    }
-
     if (!response.ok) {
       console.log('DEBUG - API Error Response:', responseText);
       return {
@@ -168,6 +158,19 @@ exports.handler = async (event, context) => {
       apiResponse = JSON.parse(responseText);
     } catch (parseError) {
       console.log('DEBUG - JSON Parse Error:', parseError.message);
+      // Check if the response might be HTML despite having JSON content
+      const isHtmlResponse = response.headers.get('content-type')?.includes('text/html') && responseText.includes('<html');
+      if (isHtmlResponse) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ 
+            error: 'API returned HTML instead of JSON',
+            message: 'This usually indicates authentication issues or wrong endpoint',
+            responsePreview: responseText.substring(0, 500) + '...'
+          })
+        };
+      }
       return {
         statusCode: 500,
         headers,
@@ -180,6 +183,23 @@ exports.handler = async (event, context) => {
 
     console.log('DEBUG - Parsed Response:', JSON.stringify(apiResponse, null, 2));
 
+    // Check for API errors first
+    if (apiResponse.ErrorMessage || apiResponse.error) {
+      const errorMsg = apiResponse.ErrorMessage || apiResponse.error;
+      console.log('DEBUG - API Error:', errorMsg);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'API Error',
+          message: errorMsg,
+          suggestion: errorMsg.includes('PackagingType') ? 
+            'Try using one of these packaging types: BOX, PALLET, CRATE, BAG, BUNDLE, DRUM, CARTON, CASE, SKID' : 
+            'Please check your request parameters'
+        })
+      };
+    }
+
     // Check for no results
     if (!apiResponse || (Array.isArray(apiResponse) && apiResponse.length === 0)) {
       return {
@@ -191,20 +211,6 @@ exports.handler = async (event, context) => {
 
     // Get the best rate
     const bestRate = Array.isArray(apiResponse) ? apiResponse[0] : apiResponse;
-    
-    // Check for API errors
-    if (bestRate.ErrorMessage || bestRate.error) {
-      const errorMsg = bestRate.ErrorMessage || bestRate.error;
-      console.log('DEBUG - API Error:', errorMsg);
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          error: 'API Error',
-          message: errorMsg
-        })
-      };
-    }
 
     // Calculate markup
     const markup = parseFloat(requestData.markup || 50.00);
