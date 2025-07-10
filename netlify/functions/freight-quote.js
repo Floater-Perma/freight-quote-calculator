@@ -94,15 +94,23 @@ exports.handler = async (event, context) => {
     console.log('DEBUG - API Request:', JSON.stringify(apiRequest, null, 2));
 
     // Make the API call to Concept Logistics
-    console.log('DEBUG - Making API call to:', API_CONFIG.prodUrl);
-    const response = await fetch(API_CONFIG.prodUrl, { // Change to testUrl for testing
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(apiRequest)
-    });
+    console.log('DEBUG - Making API call to:', API_CONFIG.testUrl);
+    
+    let response;
+    try {
+      response = await fetch(API_CONFIG.testUrl, { // Using TEST URL first
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(apiRequest),
+        timeout: 30000 // 30 second timeout
+      });
+    } catch (fetchError) {
+      console.log('DEBUG - Fetch error:', fetchError.message);
+      throw new Error(`Network request failed: ${fetchError.message}`);
+    }
 
     console.log('DEBUG - Response status:', response.status);
     console.log('DEBUG - Response headers:', Object.fromEntries(response.headers.entries()));
