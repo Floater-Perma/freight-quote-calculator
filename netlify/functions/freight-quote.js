@@ -81,7 +81,7 @@ exports.handler = async (event, context) => {
     const API_CONFIG = {
       authToken: process.env.CONCEPT_AUTH_TOKEN || '6CE90699-1CC4-8248-8B96-693BB1CC8CB8',
       busId: process.env.CONCEPT_BUS_ID || 'YOUR_BUS_ID',
-      testUrl: 'https://ads.fmcloud.fm/Webservices/ConceptLogisticsRateRequestTEST.php'
+      testUrl: 'https://cls.conceptlogistics.com/Webservices/ConceptLogisticsRateRequest.php'
     };
 
     console.log('DEBUG - API Config:', {
